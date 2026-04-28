@@ -10,7 +10,6 @@ export default function App() {
   ];
 
   const agents = ["Unassigned", "Agent 1", "Agent 2", "Agent 3", "Manager"];
-
   const outcomes = [
     "—",
     "Left Voicemail",
@@ -67,7 +66,9 @@ export default function App() {
   ]);
 
   function updateLead(id, patch) {
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    setLeads((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, ...patch } : l))
+    );
   }
 
   function daysSince(dateStr) {
@@ -100,7 +101,7 @@ export default function App() {
       ? "#eab308"
       : "#cbd5e1";
 
-  const decorated = useMemo(
+  const rows = useMemo(
     () =>
       leads.map((l) => ({
         ...l,
@@ -114,133 +115,130 @@ export default function App() {
     <div className="wrap">
       <h1>April Reorder Call Tracker</h1>
       <div className="small">
-        Click a card to expand. This keeps 150 names easy to scan.
+        CRM‑style compact list — click a row to expand.
       </div>
 
-      <div className="board" style={{ marginTop: 12 }}>
+      <div className="board" style={{ marginTop: 16 }}>
         {columns.map((col) => (
           <div className="col" key={col}>
-            <h3 style={{ marginBottom: 10 }}>{col}</h3>
+            <h3>{col}</h3>
 
-            {decorated
-              .filter((l) => l.status === col)
+            {rows
+              .filter((r) => r.status === col)
               .map((lead) => {
-                const isOpen = expandedId === lead.id;
+                const open = expandedId === lead.id;
 
                 return (
                   <div
-                    className={`card ${isOpen ? "expanded" : ""}`}
                     key={lead.id}
+                    className={`card ${open ? "expanded" : ""}`}
                     style={{
                       borderLeft: `6px solid ${priorityColor(lead.priority)}`,
                       cursor: "pointer",
                     }}
-                    onClick={() => setExpandedId(isOpen ? null : lead.id)}
+                    onClick={() =>
+                      setExpandedId(open ? null : lead.id)
+                    }
                   >
-                    {/* Compact header (always visible) */}
+                    {/* COMPACT ROW */}
                     <div className="card-header">
                       <div className="card-name">{lead.name}</div>
                       <div className="card-meta">
-                        {lead.phone} • ${lead.value.toFixed(2)} • {lead.priority}
+                        {lead.phone} • ${lead.value.toFixed(2)} •{" "}
+                        {lead.priority} • {lead.status}
                       </div>
                     </div>
 
-                    {/* Details (hidden unless expanded) */}
-                    <div
-                      className="card-details"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="small" style={{ marginTop: 8 }}>
-                        Agent
-                      </div>
-                      <select
-                        value={lead.agent}
-                        onChange={(e) =>
-                          updateLead(lead.id, { agent: e.target.value })
-                        }
-                      >
-                        {agents.map((a) => (
-                          <option key={a} value={a}>
-                            {a}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="small" style={{ marginTop: 8 }}>
-                        Call Outcome
-                      </div>
-                      <select
-                        value={lead.outcome}
-                        onChange={(e) =>
-                          updateLead(lead.id, { outcome: e.target.value })
-                        }
-                      >
-                        {outcomes.map((o) => (
-                          <option key={o} value={o}>
-                            {o}
-                          </option>
-                        ))}
-                      </select>
-
-                      <div className="small" style={{ marginTop: 8 }}>
-                        Last Call Date
-                      </div>
-                      <input
-                        type="date"
-                        value={lead.lastCallDate}
-                        onChange={(e) =>
-                          updateLead(lead.id, { lastCallDate: e.target.value })
-                        }
-                      />
-
+                    {/* EXPANDED PANEL */}
+                    {open && (
                       <div
-                        style={{ marginTop: 8 }}
-                        className={lead.followUp ? "flag-bad" : "flag-ok"}
+                        className="card-details"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {lead.followUp ? "FOLLOW UP" : "OK"}
-                      </div>
-
-                      <div className="small" style={{ marginTop: 8 }}>
-                        Notes
-                      </div>
-                      <textarea
-                        value={lead.notes}
-                        onChange={(e) =>
-                          updateLead(lead.id, { notes: e.target.value })
-                        }
-                      />
-
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 6,
-                          marginTop: 8,
-                        }}
-                      >
-                        {columns
-                          .filter((c) => c !== col)
-                          .map((c) => (
-                            <button
-                              className="btn"
-                              key={c}
-                              onClick={() =>
-                                updateLead(lead.id, { status: c })
-                              }
-                            >
-                              {c}
-                            </button>
+                        <div className="small">Agent</div>
+                        <select
+                          value={lead.agent}
+                          onChange={(e) =>
+                            updateLead(lead.id, {
+                              agent: e.target.value,
+                            })
+                          }
+                        >
+                          {agents.map((a) => (
+                            <option key={a}>{a}</option>
                           ))}
+                        </select>
+
+                        <div className="small">Outcome</div>
+                        <select
+                          value={lead.outcome}
+                          onChange={(e) =>
+                            updateLead(lead.id, {
+                              outcome: e.target.value,
+                            })
+                          }
+                        >
+                          {outcomes.map((o) => (
+                            <option key={o}>{o}</option>
+                          ))}
+                        </select>
+
+                        <div className="small">Last Call Date</div>
+                        <input
+                          type="date"
+                          value={lead.lastCallDate}
+                          onChange={(e) =>
+                            updateLead(lead.id, {
+                              lastCallDate: e.target.value,
+                            })
+                          }
+                        />
+
+                        <div
+                          className={
+                            lead.followUp ? "flag-bad" : "flag-ok"
+                          }
+                        >
+                          {lead.followUp
+                            ? "FOLLOW UP REQUIRED"
+                            : "OK"}
+                        </div>
+
+                        <div className="small">Notes</div>
+                        <textarea
+                          value={lead.notes}
+                          onChange={(e) =>
+                            updateLead(lead.id, {
+                              notes: e.target.value,
+                            })
+                          }
+                        />
+
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {columns
+                            .filter((c) => c !== col)
+                            .map((c) => (
+                              <button
+                                key={c}
+                                className="btn"
+                                onClick={() =>
+                                  updateLead(lead.id, {
+                                    status: c,
+                                  })
+                                }
+                              >
+                                {c}
+                              </button>
+                            ))}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
                 );
               })}
 
-            {decorated.filter((l) => l.status === col).length === 0 && (
-              <div className="small" style={{ fontStyle: "italic" }}>
-                No leads
-              </div>
+            {rows.filter((r) => r.status === col).length === 0 && (
+              <div className="small">No leads</div>
             )}
           </div>
         ))}
