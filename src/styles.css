@@ -6,3 +6,31 @@
   margin-bottom: 6px;
   font-size: 13px;
 }
+/* === COMPACT MODE FIX === */
+
+/* Header row: name + meta only */
+.card-header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.card-name {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.card-meta {
+  font-size: 12px;
+  color: #555;
+}
+
+/* Hide heavy controls by default */
+.card-details {
+  display: none;
+}
+
+/* Show controls only when expanded */
+.card.expanded .card-details {
+  display: block;
+}
