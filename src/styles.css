@@ -1,3 +1,26 @@
+:root {
+  /* App background */
+  --bg-app: #f5f6f8;
+
+  /* Card / surface */
+  --card: #ffffff;
+
+  /* Borders */
+  --border: #e5e7eb;
+
+  /* Text */
+  --text-primary: #1f2937;
+  --text-secondary: #6b7280;
+
+  /* Accent */
+  --accent: #2563eb;
+
+  /* Status */
+  --success-bg: #ecfdf3;
+  --success-text: #047857;
+  --warn-bg: #fff1f2;
+  --warn-text: #be123c;
+}
 .card {
   background: var(--card);
   border: 1px solid var(--border);
