@@ -1,12 +1,39 @@
-<!doctype html>
-<html lang="en">
+
+<!DOCTYPE html>
+<html>
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>April Reorder Call Tracker</title>
+    <title>April Reorder Tracker</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #f6f7fb;
+        padding: 20px;
+      }
+      .card {
+        background: white;
+        padding: 15px;
+        border-radius: 8px;
+        margin-bottom: 10px;
+      }
+      button {
+        margin-top: 5px;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <h1>April Reorder Call Tracker</h1>
+    <p>If you can see this, the site is working ✅</p>
+
+    <div class="card">
+      <strong>Brian Obremski</strong><br />
+      Status:
+      <select>
+        <option>Not Called</option>
+        <option>Called – No Answer</option>
+        <option>Spoke – Considering</option>
+        <option>Reorder Placed</option>
+      </select>
+    </div>
   </body>
 </html>
