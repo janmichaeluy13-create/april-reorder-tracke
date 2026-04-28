@@ -161,3 +161,5 @@ export default function App() {
     </div>
   );
 }
+<div className="card expanded">
+``
