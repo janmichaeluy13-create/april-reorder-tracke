@@ -25,6 +25,8 @@ export default function App() {
   const FOLLOW_UP_DAYS = 2;
   const FOLLOW_UP_STATUSES = new Set(["Called – No Answer", "Spoke – Considering"]);
 
+  const [expandedId, setExpandedId] = useState(null);
+
   const [leads, setLeads] = useState([
     {
       id: "l1",
@@ -84,10 +86,15 @@ export default function App() {
     return "P4";
   }
 
-  const priorityColor = (p) =>
-    p === "VIP" ? "#7c3aed" : p === "P1" ? "#dc2626" : p === "P2" ? "#f97316" : p === "P3" ? "#eab308" : "#cbd5e1";
+  function priorityColor(priority) {
+    if (priority === "VIP") return "var(--vip)";
+    if (priority === "P1") return "var(--p1)";
+    if (priority === "P2") return "var(--p2)";
+    if (priority === "P3") return "var(--p3)";
+    return "var(--p4)";
+  }
 
-  const decorated = useMemo(
+  const rows = useMemo(
     () =>
       leads.map((l) => ({
         ...l,
@@ -100,59 +107,101 @@ export default function App() {
   return (
     <div className="wrap">
       <h1>April Reorder Call Tracker</h1>
-      <div className="small">Assign agent, pick outcome, set last-call date, and move statuses.</div>
+      <div className="small">Double‑click a name to open details. Keeps 150+ leads easy to scan.</div>
 
-      <div className="board" style={{ marginTop: 12 }}>
+      <div className="board">
         {columns.map((col) => (
           <div className="col" key={col}>
-            <h3 style={{ marginBottom: 10 }}>{col}</h3>
+            <h3>{col}</h3>
 
-            {decorated.filter((l) => l.status === col).map((lead) => (
-              <div className="card" key={lead.id} style={{ borderLeft: `6px solid ${priorityColor(lead.priority)}` }}>
-                <div style={{ fontWeight: 800 }}>{lead.name}</div>
-                <div className="small">
-                  {lead.phone} • ${lead.value.toFixed(2)} • {lead.priority}
-                </div>
+            {rows
+              .filter((r) => r.status === col)
+              .map((lead) => {
+                const open = expandedId === lead.id;
 
-                <div className="small" style={{ marginTop: 8 }}>Agent</div>
-                <select value={lead.agent} onChange={(e) => updateLead(lead.id, { agent: e.target.value })}>
-                  {agents.map((a) => (
-                    <option key={a} value={a}>{a}</option>
-                  ))}
-                </select>
+                return (
+                  <div
+                    key={lead.id}
+                    className={`card ${open ? "expanded" : ""}`}
+                    style={{ borderLeft: `6px solid ${priorityColor(lead.priority)}` }}
+                  >
+                    {/* HEADER ONLY */}
+                    <div className="card-header">
+                      <div
+                        className="card-name"
+                        title="Double‑click to open"
+                        onDoubleClick={() => setExpandedId(open ? null : lead.id)}
+                      >
+                        {lead.name}
+                      </div>
 
-                <div className="small" style={{ marginTop: 8 }}>Call Outcome</div>
-                <select value={lead.outcome} onChange={(e) => updateLead(lead.id, { outcome: e.target.value })}>
-                  {outcomes.map((o) => (
-                    <option key={o} value={o}>{o}</option>
-                  ))}
-                </select>
+                      <span className="chip" title="Priority">
+                        <span className="dot" style={{ background: priorityColor(lead.priority) }} />
+                        {lead.priority}
+                      </span>
+                    </div>
 
-                <div className="small" style={{ marginTop: 8 }}>Last Call Date</div>
-                <input
-                  type="date"
-                  value={lead.lastCallDate}
-                  onChange={(e) => updateLead(lead.id, { lastCallDate: e.target.value })}
-                />
+                    <div className="card-meta">
+                      {lead.phone} • ${lead.value.toFixed(2)}
+                    </div>
 
-                <div style={{ marginTop: 8 }} className={lead.followUp ? "flag-bad" : "flag-ok"}>
-                  {lead.followUp ? "FOLLOW UP" : "OK"}
-                </div>
+                    {/* DETAILS (HIDDEN unless expanded) */}
+                    <div className="card-details">
+                      <label>Agent</label>
+                      <select
+                        value={lead.agent}
+                        onChange={(e) => updateLead(lead.id, { agent: e.target.value })}
+                      >
+                        {agents.map((a) => (
+                          <option key={a} value={a}>{a}</option>
+                        ))}
+                      </select>
 
-                <div className="small" style={{ marginTop: 8 }}>Notes</div>
-                <textarea value={lead.notes} onChange={(e) => updateLead(lead.id, { notes: e.target.value })} />
+                      <label>Call Outcome</label>
+                      <select
+                        value={lead.outcome}
+                        onChange={(e) => updateLead(lead.id, { outcome: e.target.value })}
+                      >
+                        {outcomes.map((o) => (
+                          <option key={o} value={o}>{o}</option>
+                        ))}
+                      </select>
 
-                <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
-                  {columns.filter((c) => c !== col).map((c) => (
-                    <button className="btn" key={c} onClick={() => updateLead(lead.id, { status: c })}>
-                      {c}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ))}
+                      <label>Last Call Date</label>
+                      <input
+                        type="date"
+                        value={lead.lastCallDate}
+                        onChange={(e) => updateLead(lead.id, { lastCallDate: e.target.value })}
+                      />
 
-            {decorated.filter((l) => l.status === col).length === 0 && (
+                      <div className={lead.followUp ? "flag-bad" : "flag-ok"}>
+                        {lead.followUp ? "FOLLOW UP" : "OK"}
+                      </div>
+
+                      <label>Notes</label>
+                      <textarea
+                        value={lead.notes}
+                        onChange={(e) => updateLead(lead.id, { notes: e.target.value })}
+                        placeholder="Quick notes…"
+                      />
+
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
+                        {columns.filter((c) => c !== col).map((c) => (
+                          <button
+                            key={c}
+                            className="btn"
+                            onClick={() => updateLead(lead.id, { status: c })}
+                          >
+                            {c}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+            {rows.filter((r) => r.status === col).length === 0 && (
               <div className="small" style={{ fontStyle: "italic" }}>No leads</div>
             )}
           </div>
