@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 
 export default function App() {
-  const columns = [
+  const [view, setView] = useState("list");      // "list" | "board"
+  const [groupBy, setGroupBy] = useState("status"); // "status" | "agent"
+  const [query, setQuery] = useState("");
+  const [drawerId, setDrawerId] = useState(null);
+
+  const statusCols = [
     "Not Called",
     "Called – No Answer",
     "Spoke – Considering",
@@ -23,53 +28,16 @@ export default function App() {
   ];
 
   const FOLLOW_UP_DAYS = 2;
-  const FOLLOW_UP_STATUSES = new Set([
-    "Called – No Answer",
-    "Spoke – Considering",
-  ]);
-
-  const [expandedId, setExpandedId] = useState(null);
+  const FOLLOW_UP_STATUSES = new Set(["Called – No Answer", "Spoke – Considering"]);
 
   const [leads, setLeads] = useState([
-    {
-      id: "l1",
-      name: "Brian Obremski",
-      phone: "(262) 282-0754",
-      value: 879.8,
-      status: "Not Called",
-      agent: "Unassigned",
-      lastCallDate: "",
-      outcome: "—",
-      notes: "",
-    },
-    {
-      id: "l2",
-      name: "Jack Bray",
-      phone: "(805) 872-5757",
-      value: 669.8,
-      status: "Not Called",
-      agent: "Unassigned",
-      lastCallDate: "",
-      outcome: "—",
-      notes: "",
-    },
-    {
-      id: "l3",
-      name: "Dennis Guimond (VIP)",
-      phone: "(518) 578-3315",
-      value: 359.8,
-      status: "Not Called",
-      agent: "Unassigned",
-      lastCallDate: "",
-      outcome: "—",
-      notes: "Repeat buyer — prioritize",
-    },
+    { id:"l1", name:"Brian Obremski", phone:"(262) 282-0754", value:879.8, status:"Not Called", agent:"Unassigned", lastCallDate:"", outcome:"—", notes:"" },
+    { id:"l2", name:"Jack Bray", phone:"(805) 872-5757", value:669.8, status:"Not Called", agent:"Unassigned", lastCallDate:"", outcome:"—", notes:"" },
+    { id:"l3", name:"Dennis Guimond (VIP)", phone:"(518) 578-3315", value:359.8, status:"Not Called", agent:"Unassigned", lastCallDate:"", outcome:"—", notes:"Repeat buyer — prioritize" },
   ]);
 
   function updateLead(id, patch) {
-    setLeads((prev) =>
-      prev.map((l) => (l.id === id ? { ...l, ...patch } : l))
-    );
+    setLeads(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
   }
 
   function daysSince(dateStr) {
@@ -83,7 +51,7 @@ export default function App() {
     return daysSince(lead.lastCallDate) >= FOLLOW_UP_DAYS;
   }
 
-  function computePriority(value, name = "") {
+  function computePriority(value, name="") {
     if (/VIP/i.test(name)) return "VIP";
     if (value >= 500) return "P1";
     if (value >= 250) return "P2";
@@ -91,157 +59,188 @@ export default function App() {
     return "P4";
   }
 
-  function priorityColor(priority) {
-    if (priority === "VIP") return "var(--vip)";
-    if (priority === "P1") return "var(--p1)";
-    if (priority === "P2") return "var(--p2)";
-    if (priority === "P3") return "var(--p3)";
+  function priorityColor(p){
+    if (p === "VIP") return "var(--vip)";
+    if (p === "P1") return "var(--p1)";
+    if (p === "P2") return "var(--p2)";
+    if (p === "P3") return "var(--p3)";
     return "var(--p4)";
   }
 
-  const rows = useMemo(
-    () =>
-      leads.map((l) => ({
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return leads
+      .map(l => ({
         ...l,
         priority: computePriority(l.value, l.name),
         followUp: shouldFollowUp(l),
-      })),
-    [leads]
-  );
+      }))
+      .filter(l => {
+        if (!q) return true;
+        return (
+          l.name.toLowerCase().includes(q) ||
+          l.phone.toLowerCase().includes(q) ||
+          String(l.value).includes(q) ||
+          l.status.toLowerCase().includes(q) ||
+          l.agent.toLowerCase().includes(q)
+        );
+      });
+  }, [leads, query]);
 
-  // ---------- Keyboard Navigation (roving focus) ----------
-  const rowRefs = useRef(new Map());
+  const boardColumns = useMemo(() => (groupBy === "status" ? statusCols : agents), [groupBy, statusCols, agents]);
 
-  const orderedIds = useMemo(() => {
-    return columns.flatMap((col) =>
-      rows.filter((r) => r.status === col).map((r) => r.id)
-    );
-  }, [columns, rows]);
-
-  const idToIndex = useMemo(() => {
-    const m = new Map();
-    orderedIds.forEach((id, i) => m.set(id, i));
-    return m;
-  }, [orderedIds]);
-
-  const [activeId, setActiveId] = useState(() => orderedIds[0] ?? null);
-
-  useEffect(() => {
-    if (!activeId && orderedIds.length) setActiveId(orderedIds[0]);
-    if (activeId && !idToIndex.has(activeId) && orderedIds.length) {
-      setActiveId(orderedIds[0]);
-    }
-  }, [orderedIds, idToIndex, activeId]);
-
-  useEffect(() => {
-    if (!activeId) return;
-    const el = rowRefs.current.get(activeId);
-    if (el) el.focus();
-  }, [activeId]);
-
-  function onBoardKeyDown(e) {
-    if (!activeId) return;
-
-    const i = idToIndex.get(activeId);
-    if (i === undefined) return;
-
-    const keys = [
-      "ArrowDown",
-      "ArrowUp",
-      "Home",
-      "End",
-      "Enter",
-      " ",
-      "Escape",
-    ];
-    if (!keys.includes(e.key)) return;
-
-    e.preventDefault();
-
-    if (e.key === "ArrowDown") {
-      setActiveId(orderedIds[Math.min(i + 1, orderedIds.length - 1)]);
-    } else if (e.key === "ArrowUp") {
-      setActiveId(orderedIds[Math.max(i - 1, 0)]);
-    } else if (e.key === "Home") {
-      setActiveId(orderedIds[0]);
-    } else if (e.key === "End") {
-      setActiveId(orderedIds[orderedIds.length - 1]);
-    } else if (e.key === "Enter" || e.key === " ") {
-      setExpandedId(expandedId === activeId ? null : activeId);
-    } else if (e.key === "Escape") {
-      setExpandedId(null);
-    }
+  function keyForLead(lead){
+    return groupBy === "status" ? lead.status : lead.agent;
   }
-  // -------------------------------------------------------
+
+  const drawerLead = drawerId ? leads.find(l => l.id === drawerId) : null;
 
   return (
     <div className="wrap">
       <h1>April Reorder Call Tracker</h1>
-      <div className="small">
-        Double‑click a name to open. Keyboard: ↑ ↓ Home End, Enter/Space opens,
-        Esc closes.
+      <div className="small">Table view + board view. Changing Status/Agent moves the lead automatically.</div>
+
+      <div className="toolbar">
+        <div className="toolbarLeft">
+          <button className={`pillBtn ${view==="list" ? "active":""}`} onClick={() => setView("list")}>List</button>
+          <button className={`pillBtn ${view==="board" ? "active":""}`} onClick={() => setView("board")}>Board</button>
+
+          <input
+            className="cellSelect"
+            style={{ minWidth: 240 }}
+            placeholder="Search name / phone / status / agent…"
+            value={query}
+            onChange={(e)=>setQuery(e.target.value)}
+          />
+        </div>
+
+        <div className="toolbarRight">
+          <span className="small">Group board by:</span>
+          <button className={`pillBtn ${groupBy==="status" ? "active":""}`} onClick={() => setGroupBy("status")}>Status</button>
+          <button className={`pillBtn ${groupBy==="agent" ? "active":""}`} onClick={() => setGroupBy("agent")}>Agent</button>
+        </div>
       </div>
 
-      <div
-        className="board"
-        tabIndex={0}
-        onKeyDown={onBoardKeyDown}
-        style={{ outline: "none" }}
-      >
-        {columns.map((col) => (
-          <div className="col" key={col}>
-            <h3>{col}</h3>
+      {view === "list" && (
+        <div className="tableWrap">
+          <table className="crmTable">
+            <thead>
+              <tr>
+                <th>Name</th><th>Phone</th><th>$</th><th>Priority</th>
+                <th>Status</th><th>Agent</th><th>Outcome</th><th>Last Call</th><th>Follow‑up</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((l) => (
+                <tr className="crmRow" key={l.id}>
+                  <td>
+                    <span className="nameLink" onClick={() => setDrawerId(l.id)}>{l.name}</span>
+                  </td>
+                  <td>{l.phone}</td>
+                  <td>${l.value.toFixed(2)}</td>
+                  <td>
+                    <span className="badge">
+                      <span className="dot" style={{ background: priorityColor(l.priority) }} />
+                      {l.priority}
+                    </span>
+                  </td>
 
-            {rows
-              .filter((r) => r.status === col)
-              .map((lead) => {
-                const open = expandedId === lead.id;
-                const isActive = activeId === lead.id;
+                  <td>
+                    <select className="cellSelect" value={l.status} onChange={(e)=>updateLead(l.id,{ status: e.target.value })}>
+                      {statusCols.map(s => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="cellSelect" value={l.agent} onChange={(e)=>updateLead(l.id,{ agent: e.target.value })}>
+                      {agents.map(a => <option key={a} value={a}>{a}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <select className="cellSelect" value={l.outcome} onChange={(e)=>updateLead(l.id,{ outcome: e.target.value })}>
+                      {outcomes.map(o => <option key={o} value={o}>{o}</option>)}
+                    </select>
+                  </td>
+                  <td>
+                    <input className="cellSelect" type="date" value={l.lastCallDate} onChange={(e)=>updateLead(l.id,{ lastCallDate: e.target.value })}/>
+                  </td>
+                  <td>
+                    <span className={l.followUp ? "flag-bad" : "flag-ok"}>
+                      {l.followUp ? "FOLLOW UP" : "OK"}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 0 && (
+                <tr><td colSpan={9} className="small" style={{ padding: 14 }}>No results.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
 
-                return (
-                  <div
-                    key={lead.id}
-                    className={`card ${open ? "expanded" : ""}`}
-                    style={{
-                      borderLeft: `6px solid ${priorityColor(lead.priority)}`,
-                    }}
-                  >
-                    {/* HEADER ONLY */}
-                    <div className="card-header">
-                      <div
-                        className="card-name"
-                        tabIndex={isActive ? 0 : -1}
-                        ref={(el) => {
-                          if (el) rowRefs.current.set(lead.id, el);
-                          else rowRefs.current.delete(lead.id);
-                        }}
-                        onFocus={() => setActiveId(lead.id)}
-                        onDoubleClick={() => setExpandedId(open ? null : lead.id)}
-                        role="button"
-                        aria-expanded={open}
-                        title="Double‑click to open (or Enter/Space)"
-                        style={{ cursor: "pointer" }}
-                      >
-                        {lead.name}
-                      </div>
+      {view === "board" && (
+        <div className="board">
+          {boardColumns.map((col) => (
+            <div className="col" key={col}>
+              <h3>
+                {col} <span className="small">({rows.filter(r => keyForLead(r) === col).length})</span>
+              </h3>
 
-                      <span className="chip" title="Priority">
-                        <span
-                          className="dot"
-                          style={{ background: priorityColor(lead.priority) }}
-                        />
-                        {lead.priority}
-                      </span>
-                    </div>
+              {rows.filter(r => keyForLead(r) === col).map((l) => (
+                <div key={l.id} className="card" style={{ borderLeft: `6px solid ${priorityColor(l.priority)}` }}>
+                  <div className="card-header">
+                    <div className="card-name" onDoubleClick={() => setDrawerId(l.id)} title="Double‑click to edit">{l.name}</div>
+                    <span className="badge">
+                      <span className="dot" style={{ background: priorityColor(l.priority) }} />
+                      {l.priority}
+                    </span>
+                  </div>
+                  <div className="card-meta">{l.phone} • ${l.value.toFixed(2)}</div>
+                  <div className={l.followUp ? "flag-bad" : "flag-ok"}>{l.followUp ? "FOLLOW UP" : "OK"}</div>
+                </div>
+              ))}
 
-                    <div className="card-meta">
-                      {lead.phone} • ${lead.value.toFixed(2)}
-                    </div>
+              {rows.filter(r => keyForLead(r) === col).length === 0 && (
+                <div className="small" style={{ fontStyle:"italic" }}>No leads</div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
 
-                    {/* DETAILS */}
-                    <div className="card-details">
-                      <label>Agent</label>
-                      <select
-                        value={lead.agent}
-                        onChange={(e) =>
- 
+      {drawerLead && (
+        <div className="drawerBackdrop" onClick={() => setDrawerId(null)}>
+          <div className="drawer" onClick={(e)=>e.stopPropagation()}>
+            <div className="drawerHeader">
+              <div className="drawerTitle">{drawerLead.name}</div>
+              <button className="pillBtn" onClick={() => setDrawerId(null)}>Close</button>
+            </div>
+
+            <div className="small">{drawerLead.phone} • ${drawerLead.value.toFixed(2)}</div>
+
+            <span className="smallLabel">Status</span>
+            <select className="cellSelect" value={drawerLead.status} onChange={(e)=>updateLead(drawerLead.id,{status:e.target.value})}>
+              {statusCols.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+
+            <span className="smallLabel">Agent</span>
+            <select className="cellSelect" value={drawerLead.agent} onChange={(e)=>updateLead(drawerLead.id,{agent:e.target.value})}>
+              {agents.map(a => <option key={a} value={a}>{a}</option>)}
+            </select>
+
+            <span className="smallLabel">Outcome</span>
+            <select className="cellSelect" value={drawerLead.outcome} onChange={(e)=>updateLead(drawerLead.id,{outcome:e.target.value})}>
+              {outcomes.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+
+            <span className="smallLabel">Last Call Date</span>
+            <input className="cellSelect" type="date" value={drawerLead.lastCallDate} onChange={(e)=>updateLead(drawerLead.id,{lastCallDate:e.target.value})} />
+
+            <span className="smallLabel">Notes</span>
+            <textarea value={drawerLead.notes} onChange={(e)=>updateLead(drawerLead.id,{notes:e.target.value})} />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
