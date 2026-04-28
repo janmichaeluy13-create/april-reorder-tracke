@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 export default function App() {
   const columns = [
@@ -23,7 +23,10 @@ export default function App() {
   ];
 
   const FOLLOW_UP_DAYS = 2;
-  const FOLLOW_UP_STATUSES = new Set(["Called – No Answer", "Spoke – Considering"]);
+  const FOLLOW_UP_STATUSES = new Set([
+    "Called – No Answer",
+    "Spoke – Considering",
+  ]);
 
   const [expandedId, setExpandedId] = useState(null);
 
@@ -64,7 +67,9 @@ export default function App() {
   ]);
 
   function updateLead(id, patch) {
-    setLeads((prev) => prev.map((l) => (l.id === id ? { ...l, ...patch } : l)));
+    setLeads((prev) =>
+      prev.map((l) => (l.id === id ? { ...l, ...patch } : l))
+    );
   }
 
   function daysSince(dateStr) {
@@ -104,12 +109,85 @@ export default function App() {
     [leads]
   );
 
+  // ---------- Keyboard Navigation (roving focus) ----------
+  const rowRefs = useRef(new Map());
+
+  const orderedIds = useMemo(() => {
+    return columns.flatMap((col) =>
+      rows.filter((r) => r.status === col).map((r) => r.id)
+    );
+  }, [columns, rows]);
+
+  const idToIndex = useMemo(() => {
+    const m = new Map();
+    orderedIds.forEach((id, i) => m.set(id, i));
+    return m;
+  }, [orderedIds]);
+
+  const [activeId, setActiveId] = useState(() => orderedIds[0] ?? null);
+
+  useEffect(() => {
+    if (!activeId && orderedIds.length) setActiveId(orderedIds[0]);
+    if (activeId && !idToIndex.has(activeId) && orderedIds.length) {
+      setActiveId(orderedIds[0]);
+    }
+  }, [orderedIds, idToIndex, activeId]);
+
+  useEffect(() => {
+    if (!activeId) return;
+    const el = rowRefs.current.get(activeId);
+    if (el) el.focus();
+  }, [activeId]);
+
+  function onBoardKeyDown(e) {
+    if (!activeId) return;
+
+    const i = idToIndex.get(activeId);
+    if (i === undefined) return;
+
+    const keys = [
+      "ArrowDown",
+      "ArrowUp",
+      "Home",
+      "End",
+      "Enter",
+      " ",
+      "Escape",
+    ];
+    if (!keys.includes(e.key)) return;
+
+    e.preventDefault();
+
+    if (e.key === "ArrowDown") {
+      setActiveId(orderedIds[Math.min(i + 1, orderedIds.length - 1)]);
+    } else if (e.key === "ArrowUp") {
+      setActiveId(orderedIds[Math.max(i - 1, 0)]);
+    } else if (e.key === "Home") {
+      setActiveId(orderedIds[0]);
+    } else if (e.key === "End") {
+      setActiveId(orderedIds[orderedIds.length - 1]);
+    } else if (e.key === "Enter" || e.key === " ") {
+      setExpandedId(expandedId === activeId ? null : activeId);
+    } else if (e.key === "Escape") {
+      setExpandedId(null);
+    }
+  }
+  // -------------------------------------------------------
+
   return (
     <div className="wrap">
       <h1>April Reorder Call Tracker</h1>
-      <div className="small">Double‑click a name to open details. Keeps 150+ leads easy to scan.</div>
+      <div className="small">
+        Double‑click a name to open. Keyboard: ↑ ↓ Home End, Enter/Space opens,
+        Esc closes.
+      </div>
 
-      <div className="board">
+      <div
+        className="board"
+        tabIndex={0}
+        onKeyDown={onBoardKeyDown}
+        style={{ outline: "none" }}
+      >
         {columns.map((col) => (
           <div className="col" key={col}>
             <h3>{col}</h3>
@@ -118,25 +196,40 @@ export default function App() {
               .filter((r) => r.status === col)
               .map((lead) => {
                 const open = expandedId === lead.id;
+                const isActive = activeId === lead.id;
 
                 return (
                   <div
                     key={lead.id}
                     className={`card ${open ? "expanded" : ""}`}
-                    style={{ borderLeft: `6px solid ${priorityColor(lead.priority)}` }}
+                    style={{
+                      borderLeft: `6px solid ${priorityColor(lead.priority)}`,
+                    }}
                   >
                     {/* HEADER ONLY */}
                     <div className="card-header">
                       <div
                         className="card-name"
-                        title="Double‑click to open"
+                        tabIndex={isActive ? 0 : -1}
+                        ref={(el) => {
+                          if (el) rowRefs.current.set(lead.id, el);
+                          else rowRefs.current.delete(lead.id);
+                        }}
+                        onFocus={() => setActiveId(lead.id)}
                         onDoubleClick={() => setExpandedId(open ? null : lead.id)}
+                        role="button"
+                        aria-expanded={open}
+                        title="Double‑click to open (or Enter/Space)"
+                        style={{ cursor: "pointer" }}
                       >
                         {lead.name}
                       </div>
 
                       <span className="chip" title="Priority">
-                        <span className="dot" style={{ background: priorityColor(lead.priority) }} />
+                        <span
+                          className="dot"
+                          style={{ background: priorityColor(lead.priority) }}
+                        />
                         {lead.priority}
                       </span>
                     </div>
@@ -145,68 +238,10 @@ export default function App() {
                       {lead.phone} • ${lead.value.toFixed(2)}
                     </div>
 
-                    {/* DETAILS (HIDDEN unless expanded) */}
+                    {/* DETAILS */}
                     <div className="card-details">
                       <label>Agent</label>
                       <select
                         value={lead.agent}
-                        onChange={(e) => updateLead(lead.id, { agent: e.target.value })}
-                      >
-                        {agents.map((a) => (
-                          <option key={a} value={a}>{a}</option>
-                        ))}
-                      </select>
-
-                      <label>Call Outcome</label>
-                      <select
-                        value={lead.outcome}
-                        onChange={(e) => updateLead(lead.id, { outcome: e.target.value })}
-                      >
-                        {outcomes.map((o) => (
-                          <option key={o} value={o}>{o}</option>
-                        ))}
-                      </select>
-
-                      <label>Last Call Date</label>
-                      <input
-                        type="date"
-                        value={lead.lastCallDate}
-                        onChange={(e) => updateLead(lead.id, { lastCallDate: e.target.value })}
-                      />
-
-                      <div className={lead.followUp ? "flag-bad" : "flag-ok"}>
-                        {lead.followUp ? "FOLLOW UP" : "OK"}
-                      </div>
-
-                      <label>Notes</label>
-                      <textarea
-                        value={lead.notes}
-                        onChange={(e) => updateLead(lead.id, { notes: e.target.value })}
-                        placeholder="Quick notes…"
-                      />
-
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 10 }}>
-                        {columns.filter((c) => c !== col).map((c) => (
-                          <button
-                            key={c}
-                            className="btn"
-                            onClick={() => updateLead(lead.id, { status: c })}
-                          >
-                            {c}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-
-            {rows.filter((r) => r.status === col).length === 0 && (
-              <div className="small" style={{ fontStyle: "italic" }}>No leads</div>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
+                        onChange={(e) =>
+ 
